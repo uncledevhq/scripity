@@ -16,7 +16,5 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $ZSH_CUSTOM/p
 # Update .zshrc to include the plugins
 sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
 
-# Apply changes
-source ~/.zshrc
-
 echo "Oh My Zsh with autocomplete and syntax highlighting has been installed and configured!"
+echo "Please restart your terminal or run 'zsh' to start using Oh My Zsh."
