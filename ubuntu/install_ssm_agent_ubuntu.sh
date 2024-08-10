@@ -4,9 +4,13 @@
 echo "Updating package list..."
 sudo apt-get update -y
 
+# Download the latest version of the SSM Agent
+echo "Downloading SSM Agent package..."
+wget https://s3.amazonaws.com/amazon-ssm-af-south-1/latest/debian_amd64/amazon-ssm-agent.deb
+
 # Install the SSM Agent
 echo "Installing SSM Agent..."
-sudo apt-get install -y amazon-ssm-agent
+sudo dpkg -i amazon-ssm-agent.deb
 
 # Enable the SSM Agent to start on boot
 echo "Enabling SSM Agent to start on boot..."
