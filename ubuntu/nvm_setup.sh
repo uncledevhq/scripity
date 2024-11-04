@@ -40,4 +40,18 @@ npm_version=$(npm -v)
 echo "Node.js version: $node_version"
 echo "npm version: $npm_version"
 
-echo "NVM and Node.js setup complete!"
+# Install Yarn globally
+echo "Installing Yarn globally..."
+npm install -g yarn
+
+# Verify Yarn installation
+if command -v yarn &> /dev/null
+then
+    yarn_version=$(yarn -v)
+    echo "Yarn installed successfully. Version: $yarn_version"
+else
+    echo "Yarn installation failed."
+    exit 1
+fi
+
+echo "NVM, Node.js, and Yarn setup complete!"
