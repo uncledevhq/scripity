@@ -97,5 +97,5 @@ cd $DB_DIR
 docker-compose up -d
 
 echo "Postgres database '$DB_NAME' successfully deployed on port $HOST_PORT"
-echo "Connection string: postgresql://$DB_USER:$DB_PASSWORD@<your-ec2-ip>:$HOST_PORT/$DB_NAME"
+echo "Connection string: postgresql://$DB_USER:$DB_PASSWORD@13.246.16.165:$HOST_PORT/$DB_NAME"
 echo "Container directory: $DB_DIR"
