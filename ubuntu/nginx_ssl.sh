@@ -1,43 +1,77 @@
 #!/bin/bash
 
-# Function to validate input
+set -e
+
+# -----------------------------
+# Helper: validate input
+# -----------------------------
 validate_input() {
     local input="$1"
-    local error_message="$2"
-    while [[ -z "$input" ]]; do
-        read -p "$error_message: " input
-    done
+    local prompt="$2"
+    local default="$3"
+
+    if [[ -n "$default" ]]; then
+        read -p "$prompt [$default]: " input
+        input="${input:-$default}"
+    else
+        while [[ -z "$input" ]]; do
+            read -p "$prompt: " input
+        done
+    fi
+
     echo "$input"
 }
 
-# Prompt for values
-PORT=$(validate_input "" "Enter the port number to proxy (e.g., 9000)")
-DOMAIN=$(validate_input "" "Enter the domain name (e.g., example.com)")
-EMAIL=$(validate_input "" "Enter email for Let's Encrypt SSL certificate")
+# -----------------------------
+# User inputs
+# -----------------------------
+PORT=$(validate_input "" "Enter the local port to proxy (e.g. 3000)")
+ROOT_DOMAIN=$(validate_input "" "Enter the root domain (e.g. panukaagribizhub.com)")
+EMAIL=$(validate_input "" "Enter email for Let's Encrypt (expiry notices)" "uncledevhq@gmail.com")
 
-# Update system packages
+WWW_DOMAIN="www.$ROOT_DOMAIN"
+
+echo ""
+echo "======================================"
+echo "Nginx Reverse Proxy + SSL Configuration"
+echo "--------------------------------------"
+echo "Root domain : $ROOT_DOMAIN"
+echo "WWW domain  : $WWW_DOMAIN"
+echo "Proxy port  : localhost:$PORT"
+echo "Certbot email: $EMAIL"
+echo "======================================"
+echo ""
+
+# -----------------------------
+# System update
+# -----------------------------
 sudo apt update
 sudo apt upgrade -y
 
-# Install Nginx
-sudo apt install nginx -y
+# -----------------------------
+# Install required packages
+# -----------------------------
+sudo apt install -y nginx certbot python3-certbot-nginx
 
-# Install Certbot and Nginx plugin
-sudo apt install certbot python3-certbot-nginx -y
-
-# Create Nginx server block configuration
-sudo tee /etc/nginx/sites-available/"$DOMAIN" << EOF
+# -----------------------------
+# Nginx server block (HTTP)
+# -----------------------------
+sudo tee /etc/nginx/sites-available/"$ROOT_DOMAIN" > /dev/null <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $DOMAIN;
+
+    server_name $ROOT_DOMAIN $WWW_DOMAIN;
+
     location / {
         proxy_pass http://localhost:$PORT;
         proxy_http_version 1.1;
+
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
@@ -45,20 +79,38 @@ server {
 }
 EOF
 
-# Enable the site by creating a symbolic link
-sudo ln -s /etc/nginx/sites-available/"$DOMAIN" /etc/nginx/sites-enabled/
+# -----------------------------
+# Enable site
+# -----------------------------
+sudo ln -sf /etc/nginx/sites-available/"$ROOT_DOMAIN" /etc/nginx/sites-enabled/"$ROOT_DOMAIN"
 
-# Remove the default Nginx configuration if it exists
+# Remove default site if exists
 sudo rm -f /etc/nginx/sites-enabled/default
 
-# Test Nginx configuration
+# -----------------------------
+# Test & reload Nginx
+# -----------------------------
 sudo nginx -t
+sudo systemctl reload nginx
 
-# Restart Nginx
-sudo systemctl restart nginx
+# -----------------------------
+# Obtain SSL certificate (root + www)
+# -----------------------------
+sudo certbot --nginx \
+    -d "$ROOT_DOMAIN" \
+    -d "$WWW_DOMAIN" \
+    --non-interactive \
+    --agree-tos \
+    --email "$EMAIL"
 
-# Obtain SSL certificate using Certbot
-sudo certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL"
-
-# Display completion message
-echo "Setup completed! Nginx is now configured to proxy requests to port $PORT"
+# -----------------------------
+# Done
+# -----------------------------
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "Your application is now live at:"
+echo "  https://$ROOT_DOMAIN"
+echo "  https://$WWW_DOMAIN"
+echo ""
+echo "Proxying traffic to localhost:$PORT"
