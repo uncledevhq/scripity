@@ -33,6 +33,9 @@ nvm install --lts
 echo "Setting default Node.js version to the latest LTS..."
 nvm alias default 'lts/*'
 
+# Use default Node version in current shell
+nvm use default
+
 # Verify Node.js and npm installation
 echo "Verifying Node.js and npm installation..."
 node_version=$(node -v)
@@ -54,4 +57,23 @@ else
     exit 1
 fi
 
-echo "NVM, Node.js, and Yarn setup complete!"
+# Install PM2 globally
+echo "Installing PM2 globally..."
+npm install -g pm2
+
+# Verify PM2 installation
+if command -v pm2 &> /dev/null
+then
+    pm2_version=$(pm2 -v)
+    echo "PM2 installed successfully. Version: $pm2_version"
+else
+    echo "PM2 installation failed."
+    exit 1
+fi
+
+# Setup PM2 startup (systemd)
+echo "Configuring PM2 startup..."
+pm2 startup systemd -u $USER --hp $HOME
+pm2 save
+
+echo "NVM, Node.js, Yarn, and PM2 setup complete!"
