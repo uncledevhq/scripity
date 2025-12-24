@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 # -----------------------------
@@ -25,43 +24,52 @@ validate_input() {
 # -----------------------------
 # User inputs
 # -----------------------------
-PORT=$(validate_input "" "Enter the local port to proxy (e.g. 3000)")
-ROOT_DOMAIN=$(validate_input "" "Enter the root domain (e.g. panukaagribizhub.com)")
-EMAIL=$(validate_input "" "Enter email for Let's Encrypt (expiry notices)" "uncledevhq@gmail.com")
+echo "Is this a root domain or subdomain?"
+DOMAIN_TYPE=$(validate_input "" "Enter 'root' or 'subdomain'" "root")
 
-WWW_DOMAIN="www.$ROOT_DOMAIN"
+PORT=$(validate_input "" "Enter the local port to proxy (e.g. 3000)")
+
+ROOT_DOMAIN=$(validate_input "" "Enter the domain (e.g. panukaagribizhub.com)")
+if [[ "$DOMAIN_TYPE" == "subdomain" ]]; then
+    SUBDOMAIN=$(validate_input "" "Enter the subdomain (e.g. training)")
+    FULL_DOMAIN="$SUBDOMAIN.$ROOT_DOMAIN"
+else
+    FULL_DOMAIN="$ROOT_DOMAIN"
+fi
+
+EMAIL=$(validate_input "" "Enter email for Let's Encrypt (expiry notices)" "uncledevhq@gmail.com")
 
 echo ""
 echo "======================================"
 echo "Nginx Reverse Proxy + SSL Configuration"
 echo "--------------------------------------"
-echo "Root domain : $ROOT_DOMAIN"
-echo "WWW domain  : $WWW_DOMAIN"
+echo "Domain      : $FULL_DOMAIN"
 echo "Proxy port  : localhost:$PORT"
 echo "Certbot email: $EMAIL"
 echo "======================================"
 echo ""
 
 # -----------------------------
-# System update
+# System update & install
 # -----------------------------
 sudo apt update
 sudo apt upgrade -y
-
-# -----------------------------
-# Install required packages
-# -----------------------------
 sudo apt install -y nginx certbot python3-certbot-nginx
 
 # -----------------------------
-# Nginx server block (HTTP)
+# Create Nginx server block
 # -----------------------------
-sudo tee /etc/nginx/sites-available/"$ROOT_DOMAIN" > /dev/null <<EOF
+NGINX_CONF="/etc/nginx/sites-available/$FULL_DOMAIN"
+
+if [[ -f "$NGINX_CONF" ]]; then
+    echo "⚠️ Nginx config for $FULL_DOMAIN already exists. Skipping creation."
+else
+    sudo tee "$NGINX_CONF" > /dev/null <<EOF
 server {
     listen 80;
     listen [::]:80;
 
-    server_name $ROOT_DOMAIN $WWW_DOMAIN;
+    server_name $FULL_DOMAIN;
 
     location / {
         proxy_pass http://localhost:$PORT;
@@ -78,14 +86,8 @@ server {
     }
 }
 EOF
-
-# -----------------------------
-# Enable site
-# -----------------------------
-sudo ln -sf /etc/nginx/sites-available/"$ROOT_DOMAIN" /etc/nginx/sites-enabled/"$ROOT_DOMAIN"
-
-# Remove default site if exists
-sudo rm -f /etc/nginx/sites-enabled/default
+    sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
+fi
 
 # -----------------------------
 # Test & reload Nginx
@@ -94,11 +96,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 # -----------------------------
-# Obtain SSL certificate (root + www)
+# Obtain SSL certificate
 # -----------------------------
 sudo certbot --nginx \
-    -d "$ROOT_DOMAIN" \
-    -d "$WWW_DOMAIN" \
+    -d "$FULL_DOMAIN" \
     --non-interactive \
     --agree-tos \
     --email "$EMAIL"
@@ -110,7 +111,6 @@ echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "Your application is now live at:"
-echo "  https://$ROOT_DOMAIN"
-echo "  https://$WWW_DOMAIN"
+echo "  https://$FULL_DOMAIN"
 echo ""
 echo "Proxying traffic to localhost:$PORT"
