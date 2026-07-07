@@ -33,8 +33,13 @@ ROOT_DOMAIN=$(validate_input "" "Enter the domain (e.g. panukaagribizhub.com)")
 if [[ "$DOMAIN_TYPE" == "subdomain" ]]; then
     SUBDOMAIN=$(validate_input "" "Enter the subdomain (e.g. training)")
     FULL_DOMAIN="$SUBDOMAIN.$ROOT_DOMAIN"
+    SERVER_NAMES="$FULL_DOMAIN"
+    CERTBOT_DOMAINS=(-d "$FULL_DOMAIN")
 else
     FULL_DOMAIN="$ROOT_DOMAIN"
+    # Root domain: also serve/secure the www variant
+    SERVER_NAMES="$FULL_DOMAIN www.$FULL_DOMAIN"
+    CERTBOT_DOMAINS=(-d "$FULL_DOMAIN" -d "www.$FULL_DOMAIN")
 fi
 
 EMAIL=$(validate_input "" "Enter email for Let's Encrypt (expiry notices)" "uncledevhq@gmail.com")
@@ -62,14 +67,15 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 NGINX_CONF="/etc/nginx/sites-available/$FULL_DOMAIN"
 
 if [[ -f "$NGINX_CONF" ]]; then
-    echo "⚠️ Nginx config for $FULL_DOMAIN already exists. Skipping creation."
-else
-    sudo tee "$NGINX_CONF" > /dev/null <<EOF
+    echo "⚠️ Nginx config for $FULL_DOMAIN already exists. Overwriting."
+fi
+
+sudo tee "$NGINX_CONF" > /dev/null <<EOF
 server {
     listen 80;
     listen [::]:80;
 
-    server_name $FULL_DOMAIN;
+    server_name $SERVER_NAMES;
 
     location / {
         proxy_pass http://localhost:$PORT;
@@ -86,8 +92,7 @@ server {
     }
 }
 EOF
-    sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
-fi
+sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
 
 # -----------------------------
 # Test & reload Nginx
@@ -99,7 +104,7 @@ sudo systemctl reload nginx
 # Obtain SSL certificate
 # -----------------------------
 sudo certbot --nginx \
-    -d "$FULL_DOMAIN" \
+    "${CERTBOT_DOMAINS[@]}" \
     --non-interactive \
     --agree-tos \
     --email "$EMAIL"
